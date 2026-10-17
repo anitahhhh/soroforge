@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/soroworks/soroforge/internal/deploy"
@@ -157,4 +158,21 @@ func (h *handlers) statusAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+// getDeployment handles GET /v1/deployments/{id}.
+func (h *handlers) getDeployment(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid deployment id")
+		return
+	}
+
+	deployment, err := h.svc.GetDeployment(r.Context(), id)
+	if err != nil {
+		writeError(w, statusForError(err), err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, deployment)
 }

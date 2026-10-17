@@ -112,6 +112,10 @@ type Store interface {
 	// History returns a contract's deployments, newest first.
 	History(ctx context.Context, network, alias string) ([]Deployment, error)
 
+	// GetDeployment returns one deployment by its ID. It returns ErrNotFound if
+	// no deployment with that ID exists.
+	GetDeployment(ctx context.Context, id int64) (Deployment, error)
+
 	// Close releases resources held by the store.
 	Close() error
 }

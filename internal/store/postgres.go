@@ -205,6 +205,25 @@ func (p *Postgres) History(ctx context.Context, network, alias string) ([]Deploy
 	return deployments, nil
 }
 
+const getDeploymentSQL = `
+SELECT id, alias, network, contract_id, wasm_hash, action,
+       deployer_pubkey, tx_hash, ledger, notes, created_at
+FROM deployments
+WHERE id = $1`
+
+// GetDeployment implements Store.
+func (p *Postgres) GetDeployment(ctx context.Context, id int64) (Deployment, error) {
+	row := p.pool.QueryRow(ctx, getDeploymentSQL, id)
+	d, err := scanDeployment(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Deployment{}, fmt.Errorf("deployment %d: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return Deployment{}, fmt.Errorf("get deployment %d: %w", id, err)
+	}
+	return d, nil
+}
+
 // scanner is satisfied by both pgx.Row and pgx.Rows, so the column lists below
 // are written once rather than duplicated for single-row and multi-row reads.
 type scanner interface {

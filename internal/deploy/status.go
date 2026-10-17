@@ -206,3 +206,8 @@ func (s *Service) History(ctx context.Context, network, alias string) ([]store.D
 	}
 	return s.store.History(ctx, name, alias)
 }
+
+// GetDeployment returns one deployment record by its ID.
+func (s *Service) GetDeployment(ctx context.Context, id int64) (store.Deployment, error) {
+	return s.store.GetDeployment(ctx, id)
+}

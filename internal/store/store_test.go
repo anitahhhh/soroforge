@@ -195,6 +195,27 @@ func runStoreSuite(t *testing.T, newStore func(t *testing.T) store.Store) {
 		assert.Empty(t, history)
 	})
 
+	t.Run("get deployment by id returns recorded record or ErrNotFound", func(t *testing.T) {
+		s := newStore(t)
+
+		rec, err := s.RecordDeployment(ctx, store.Deployment{
+			Alias: "counter", Network: "testnet", ContractID: "C1", WasmHash: "v1",
+			Action: store.ActionDeploy, DeployerPubkey: "GABC", TxHash: "tx1", Ledger: 100,
+		})
+		require.NoError(t, err)
+
+		got, err := s.GetDeployment(ctx, rec.ID)
+		require.NoError(t, err)
+		assert.Equal(t, rec.ID, got.ID)
+		assert.Equal(t, "counter", got.Alias)
+		assert.Equal(t, "testnet", got.Network)
+		assert.Equal(t, "v1", got.WasmHash)
+
+		_, err = s.GetDeployment(ctx, 999999)
+		assert.True(t, errors.Is(err, store.ErrNotFound),
+			"expected ErrNotFound for missing deployment id, got %v", err)
+	})
+
 	t.Run("optional deployment fields survive a round trip when absent", func(t *testing.T) {
 		// tx_hash, ledger, and notes are nullable; a dry run or a failed
 		// submission leaves them unset and reading them back must not error.
