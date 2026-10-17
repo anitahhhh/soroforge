@@ -1,6 +1,7 @@
 package deploy_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -214,4 +215,45 @@ contracts:
 	require.NoError(t, err)
 	assert.Empty(t, result.Webhooks)
 	assert.False(t, called)
+}
+
+func TestWebhookSecretNeverLeaksIntoResultsOrLogs(t *testing.T) {
+	// Security: a receiver failure must report the problem without ever
+	// surfacing the shared secret in statuses, JSON results, or logs.
+	var logs bytes.Buffer
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	const secret = "super-sensitive-shared-secret"
+	cfg := fmt.Sprintf(`
+version: 1
+default_network: testnet
+networks:
+  testnet:
+    rpc_url: https://rpc.example.org
+    passphrase: "Test SDF Network ; September 2015"
+    webhooks:
+      - url: %s
+        secret: %s
+contracts:
+  counter:
+    wasm: ./counter.wasm
+`, srv.URL, secret)
+
+	h := newHarness(t, harnessOptions{configBody: cfg, logOut: &logs})
+
+	result, err := h.svc.Deploy(context.Background(), deploy.DeployRequest{Alias: "counter"})
+	require.NoError(t, err, "a failing webhook still must not fail the deploy")
+	require.Len(t, result.Webhooks, 1)
+	assert.False(t, result.Webhooks[0].OK)
+
+	encoded, err := json.Marshal(result)
+	require.NoError(t, err)
+
+	for _, leak := range []string{string(encoded), logs.String()} {
+		assert.NotContains(t, leak, secret, "the shared secret must never be reported")
+	}
 }
